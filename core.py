@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import urllib.error
 import urllib.request
@@ -172,14 +173,24 @@ def format_hypermemory_context(response):
     return "\n\n".join(blocks).strip()
 
 
-def assemble_prompt(extracted_text, brand_details, memory_context):
+def get_runtime_config():
+    return {
+        "hypermemory_api_key": os.getenv("HYPERMEMORY_API_KEY", "").strip(),
+        "hypermemory_api_url": os.getenv("HYPERMEMORY_API_URL", DEFAULT_HYPERMEMORY_API_URL).strip(),
+        "hypermemory_max_results": int(os.getenv("HYPERMEMORY_MAX_RESULTS", "10")),
+        "openrouter_api_key": os.getenv("OPENROUTER_API_KEY", "").strip(),
+        "openrouter_model": os.getenv("OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL).strip(),
+        "openrouter_temperature": float(os.getenv("OPENROUTER_TEMPERATURE", "0.4")),
+        "openrouter_max_tokens": int(os.getenv("OPENROUTER_MAX_TOKENS", "900")),
+        "system_prompt": os.getenv("OPENROUTER_SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT),
+    }
+
+
+def assemble_prompt(extracted_text, memory_context):
     sections = [
         "Create one production-ready AI video or image generation prompt from the extracted text.",
         "Return only the final prompt. Do not include markdown, labels, or explanation.",
     ]
-
-    if brand_details.strip():
-        sections.append(f"Brand details and constraints:\n{brand_details.strip()}")
 
     if memory_context.strip():
         sections.append(f"Relevant HyperMemory brand context:\n{memory_context.strip()}")
@@ -231,3 +242,42 @@ def call_openrouter(api_key, model, system_prompt, prompt, temperature=0.4, max_
 
     message = choices[0].get("message") or {}
     return (message.get("content") or "").strip()
+
+
+def generate_hypermemory_text(extracted_text):
+    config = get_runtime_config()
+    extracted_text = extracted_text.strip()
+
+    if not extracted_text:
+        return ""
+
+    memory_context = ""
+    if config["hypermemory_api_key"]:
+        try:
+            memory_response = recall_hypermemory(
+                config["hypermemory_api_key"],
+                config["hypermemory_api_url"],
+                extracted_text,
+                max_results=config["hypermemory_max_results"],
+            )
+            memory_context = format_hypermemory_context(memory_response)
+        except HyperMemoryError:
+            memory_context = ""
+
+    prompt = assemble_prompt(extracted_text, memory_context)
+    if not config["openrouter_api_key"]:
+        return extracted_text
+
+    try:
+        generated = call_openrouter(
+            config["openrouter_api_key"],
+            config["openrouter_model"],
+            config["system_prompt"],
+            prompt,
+            temperature=config["openrouter_temperature"],
+            max_tokens=config["openrouter_max_tokens"],
+        )
+    except OpenRouterError:
+        return extracted_text
+
+    return generated or prompt

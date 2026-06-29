@@ -8,6 +8,7 @@ from core import (
     call_openrouter,
     extract_text,
     format_hypermemory_context,
+    generate_hypermemory_text,
     recall_hypermemory,
 )
 
@@ -81,9 +82,8 @@ class HyperMemoryFormattingTests(unittest.TestCase):
 
 class OpenRouterTests(unittest.TestCase):
     def test_assemble_prompt(self):
-        prompt = assemble_prompt("launch sneaker", "Bold, premium tone.", "Use teal highlights.")
+        prompt = assemble_prompt("launch sneaker", "Use teal highlights.")
         self.assertIn("launch sneaker", prompt)
-        self.assertIn("Bold, premium tone.", prompt)
         self.assertIn("Use teal highlights.", prompt)
 
     @patch("core.urllib.request.urlopen")
@@ -107,6 +107,10 @@ class OpenRouterTests(unittest.TestCase):
     def test_openrouter_requires_key(self):
         with self.assertRaises(Exception):
             call_openrouter("", DEFAULT_OPENROUTER_MODEL, "system", "prompt")
+
+    @patch.dict("core.os.environ", {}, clear=True)
+    def test_generate_falls_back_to_extracted_text_without_keys(self):
+        self.assertEqual(generate_hypermemory_text("launch sneaker"), "launch sneaker")
 
 
 if __name__ == "__main__":
