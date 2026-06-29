@@ -1,4 +1,4 @@
-# hypermemory-cumfyui-extract-text-node
+# Hypermemory CumfyUI Extract Text Node
 
 A ComfyUI custom node that forks ComfyUI's `Extract Text` regex behavior and adds HyperMemory brand recall plus OpenRouter prompt generation.
 
